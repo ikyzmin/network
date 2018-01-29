@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class network:
+class Network:
     # layers -list [5 10 10 5] - 5 input, 2 hidden
     # layers (10 neurons each), 5 output
 
@@ -13,7 +13,7 @@ class network:
         for i in range(1, len(layers)):
             # create nxM+1 matrix (+bias!) with random floats in range [-1; 1]
             theta.append(
-                np.mat(np.random.uniform(-1, 1, (layers[i], layers[i - 1] + 1))))
+                np.mat(np.random.uniform(-0.0001, 0.0001, (layers[i], layers[i - 1] + 1))))
         nn = {'theta': theta, 'structure': layers}
         return nn
 
@@ -157,41 +157,53 @@ class network:
             shift += structure[i] * (structure[i - 1] + 1)
         return rolled
 
+#https://home.deib.polimi.it/matteucc/Clustering/tutorial_html/cmeans.html
+class Fuzzy:
+    def init(self, data_for_clustering):
+        centers = np.mat(len(data_for_clustering))
+        clusters = np.empty(shape=[data_for_clustering.shape[0], data_for_clustering.shape[1]])
+        fn = {'data': data_for_clustering, 'clusters': clusters, 'centers': centers, 'm': 2, 'eps': 0.01}
+        return fn
 
-nt = network()
+    def clusterize(self, fn):
+        # TODO clasterization
+        pass
+
+
+nt = Network()
 data = open("data.txt")
 raw_data = data.read().split("\n")
-input = []
-output = []
+inputRaw = []
+outputRaw = []
 raw_data = list(filter(None, raw_data))
-i = 0
 for i in range(len(raw_data)):
     if i % 2 != 0:
-        input.append(list(map(float, raw_data[i].split())))
+        inputRaw.append(list(map(float, raw_data[i].split())))
     else:
-        output.append(list(map(float, raw_data[i].split())))
+        outputRaw.append(list(map(float, raw_data[i].split())))
 
 nn = nt.create([15, 1000, 15])
 
 lamb = 0.3
 cost = 1
-alf = 0.2
-
+alf = 0.002
+npInput = np.asmatrix(inputRaw)
+npOutput = np.asmatrix(outputRaw)
 iteration = 0
 x = list()
 deltaAv = list()
-dlen = 200
-
 while (iteration < 1000):
     average = 0
-    cost = nt.costTotal(False, nn, input[0:180], output[0:180], lamb)
-    costTest = nt.costTotal(False, nn, input[181:205], output[181:205], lamb)
-    delta = nt.backpropagation(False, nn, input[0:180], output[0:180], lamb)
+    cost = nt.costTotal(False, nn, npInput[0:195], npOutput[0:195], lamb)
+    costTest = nt.costTotal(False, nn, npInput[196:205], npOutput[196:205], lamb)
+    delta = nt.backpropagation(False, nn, npInput[0:195], npOutput[0:195], lamb)
     nn['theta'] = [nn['theta'][i] - alf * delta[i] for i in range(0, len(nn['theta']))]
     print('Train cost ', cost[0, 0], 'Test cost ', costTest[0, 0])
-    print(nt.runAll(nn, input[181:205]))
+    # print(nt.runAll(nn, npInput[196:205]))
     iteration += 1
     x.append(cost[0, 0])
 plt.plot(x)
+print('Input :\n ', npInput[205], '\n', 'Output :\n', npOutput[205], '\n', 'Output From network :\n',
+      nt.runAll(nn, npInput[205]))
 plt.show()
 data.close()
