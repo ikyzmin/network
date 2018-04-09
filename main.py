@@ -1,9 +1,9 @@
-import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import skfuzzy as fuzz
 from random import *
 import math
+import os
 
 
 # Initialize a network
@@ -83,6 +83,8 @@ def update_weights(network, row, l_rate):
 # Train a network for a fixed number of epochs
 def train_network(network, train, output, l_rate, n_epoch, n_outputs):
     costs = list()
+    decay_rate = l_rate / n_epoch
+    momentum = 0.8
     for epoch in range(n_epoch):
         sum_error = 0
         rowIndex = 0
@@ -93,7 +95,8 @@ def train_network(network, train, output, l_rate, n_epoch, n_outputs):
             backward_propagate_error(network, expected)
             update_weights(network, row, l_rate)
             rowIndex += 1
-        print('>epoch=%d, lrate=%.3f, error=%.10f' % (epoch, l_rate, sum_error))
+        if epoch % 100 == 0:
+            print('>epoch=%d, lrate=%.10f, error=%.10f' % (epoch, l_rate, sum_error))
         costs.append(sum_error)
     return costs
 
@@ -105,6 +108,8 @@ def predict(network, row):
 
 seed(1)
 data = open("data.txt")
+dataOutputFuzzy = open("fuzzy_results.txt", 'w+')
+dataOutputMLP = open("MLP_results.txt", 'w+')
 raw_data = data.read().split("\n")
 inputRaw = []
 outputRaw = []
@@ -132,31 +137,46 @@ fuzzyInput = u.T
 n_inputs = len(fuzzyInput[0])
 n_outputs = len(np.asarray(npOutput)[0])
 network = initialize_network(n_inputs, 15, n_outputs)
-train_network(network, fuzzyInput[0:195], npOutput[0:195], lamb, 800, n_outputs)
-i = 196
+train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, 800, n_outputs)
+i = 164
 error = 0
 testErrorFuzzy = list()
-for row in fuzzyInput[196:206]:
+for row in fuzzyInput[164:206]:
     prediction = predict(network, row)
     error = sum([(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
     print('Test error = ', error)
     testErrorFuzzy.append(error)
+    plt.plot(list(row), npOutput[i].tolist()[0], 'go', markersize=3,label="Контрольная выборка")
+    plt.plot(list(row), prediction, 'ro', markersize=3,label="Данные персептрона")
+    dataOutputFuzzy.write(
+        "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный:\n\r" + str(prediction) + "\n\r")
     i += 1
-plt.plot(testErrorFuzzy, 'r')
+plt.legend()
+plt.show()
 
 n_inputs = len(np.asarray(npInput)[0])
 n_outputs = len(np.asarray(npOutput)[0])
 network = initialize_network(n_inputs, 15, n_outputs)
-train_network(network, npInput[0:195], npOutput[0:195], lamb, 800, n_outputs)
-i = 196
+train_network(network, npInput[0:164], npOutput[0:164], lamb, 800, n_outputs)
+i = 164
 testError = list()
-for row in npInput[196:206]:
+for row in np.asarray(npInput[164:206]):
     prediction = predict(network, row)
     error = sum([(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
     print('Test error = ', error)
     testError.append(error)
+    plt.plot(list(row), npOutput[i].tolist()[0], 'go', markersize=3,label="Контрольная выборка")
+    plt.plot(list(row), prediction, 'ro', markersize=3,label="Данные персептрона")
+    dataOutputMLP.write(
+        "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
     i += 1
+plt.legend()
+plt.show()
+plt.title("Сравнение погрешности")
+plt.plot(testErrorFuzzy, 'r')
 plt.plot(testError, 'g')
-plt.ylim([0, 0.0002])
+plt.ylim([0, 0.001])
 plt.show()
 data.close()
+dataOutputFuzzy.close()
+dataOutputMLP.close()
