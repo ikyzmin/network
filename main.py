@@ -16,6 +16,16 @@ def initialize_network(n_inputs, n_hidden, n_outputs):
     return network
 
 
+def initialize_network_with_layers(layers):
+    network = list()
+    # for each layer from the first (skip zero layer!)
+    for i in range(len(layers)-1):
+        # create nxM+1 matrix (+bias!) with random floats in range [-1; 1]
+        layer = [{'weights': [random() for j in range(layers[i] + 1)]} for j in range(layers[i+1])]
+        network.append(layer)
+    return network
+
+
 # Calculate neuron activation for an input
 def activate(weights, inputs):
     activation = weights[-1]
@@ -124,6 +134,8 @@ for i in range(len(raw_data)):
 lamb = 1.850
 cost = 1
 alf = 0.002
+epochs = 800
+c_means_epochs = 1200
 npInput = np.asmatrix(inputRaw)
 npOutput = np.asmatrix(outputRaw)
 iteration = 0
@@ -131,13 +143,13 @@ fuzzyCost = list()
 perceptronCost = list()
 deltaAv = list()
 cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
-    npInput.T, 15, 2, error=0.002, maxiter=1500, init=None)
+    npInput.T, 15, 2, error=0.002, maxiter=c_means_epochs, init=None)
 
 fuzzyInput = u.T
 n_inputs = len(fuzzyInput[0])
 n_outputs = len(np.asarray(npOutput)[0])
-network = initialize_network(n_inputs, 15, n_outputs)
-train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, 800, n_outputs)
+network = initialize_network_with_layers([n_inputs, 30, 15, n_outputs])
+train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 i = 164
 error = 0
 testErrorFuzzy = list()
@@ -146,8 +158,8 @@ for row in fuzzyInput[164:206]:
     error = sum([(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
     print('Test error = ', error)
     testErrorFuzzy.append(error)
-    plt.plot(list(row), npOutput[i].tolist()[0], 'go', markersize=3,label="Контрольная выборка")
-    plt.plot(list(row), prediction, 'ro', markersize=3,label="Данные персептрона")
+    plt.plot(list(row), npOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
+    plt.plot(list(row), prediction, 'ro', markersize=3, label="Данные персептрона")
     dataOutputFuzzy.write(
         "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный:\n\r" + str(prediction) + "\n\r")
     i += 1
@@ -156,8 +168,8 @@ plt.show()
 
 n_inputs = len(np.asarray(npInput)[0])
 n_outputs = len(np.asarray(npOutput)[0])
-network = initialize_network(n_inputs, 15, n_outputs)
-train_network(network, npInput[0:164], npOutput[0:164], lamb, 800, n_outputs)
+network = initialize_network_with_layers([n_inputs, 30, 15, n_outputs])
+train_network(network, npInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 i = 164
 testError = list()
 for row in np.asarray(npInput[164:206]):
@@ -165,17 +177,17 @@ for row in np.asarray(npInput[164:206]):
     error = sum([(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
     print('Test error = ', error)
     testError.append(error)
-    plt.plot(list(row), npOutput[i].tolist()[0], 'go', markersize=3,label="Контрольная выборка")
-    plt.plot(list(row), prediction, 'ro', markersize=3,label="Данные персептрона")
+    plt.plot(list(row), npOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
+    plt.plot(list(row), prediction, 'ro', markersize=3, label="Данные персептрона")
     dataOutputMLP.write(
         "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
     i += 1
 plt.legend()
 plt.show()
-plt.title("Сравнение погрешности")
-plt.plot(testErrorFuzzy, 'r')
-plt.plot(testError, 'g')
+plt.plot(testErrorFuzzy, 'r', label=" слой с - средних")
+plt.plot(testError, 'g', label="Классический персептрон")
 plt.ylim([0, 0.001])
+plt.legend()
 plt.show()
 data.close()
 dataOutputFuzzy.close()
