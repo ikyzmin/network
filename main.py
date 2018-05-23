@@ -117,7 +117,7 @@ def train_network(network, train, output, l_rate, n_epoch, n_outputs):
             update_weights(network, row, l_rate)
             rowIndex += 1
         if epoch % 100 == 0:
-            print('>epoch=%d, lrate=%.10f, error=%.10f' % (epoch, l_rate, sum_error))
+            print('>epoch=%d, lrate=%.2f, error=%.5f' % (epoch, l_rate, sum_error))
         costs.append(sum_error)
     return costs
 
@@ -138,7 +138,7 @@ def train_network_with_momentum(network, train, output, l_rate, n_epoch, n_outpu
         sum_error /= len(train)
         sum_error = np.sqrt(sum_error)
         if epoch % 100 == 0:
-            print('>epoch=%d, lrate=%.10f, error=%.10f' % (epoch, l_rate, sum_error))
+            print('>epoch=%d, lrate=%.2f, error=%.5f' % (epoch, l_rate, sum_error))
         costs.append(sum_error)
     return costs
 
@@ -177,6 +177,7 @@ def test(testInput, realInput, testOutput, file):
     error /= len(testInput)
     plt.legend()
     plt.show()
+    file.close()
     return np.sqrt(error)
 
 
@@ -228,7 +229,7 @@ for row in npInput:
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network(network, clusters[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorKmeans =test(clusters[164:206], npInput[164:206], npOutput[164:206], dataOutputKmeans)
-print('k-means test error = %.10f' % errorKmeans)
+print('k-means test error = %.5f' % errorKmeans)
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorFuzzy = test(fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzy)
@@ -237,18 +238,18 @@ n_outputs = len(np.asarray(npOutput)[0])
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network(network, npInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 error = test(npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLP)
-print('MLP test error = %.10f' % error)
+print('MLP test error = %.5f' % error)
 cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
     npInput.T, 15, 2, error=0.002, maxiter=c_means_epochs, init=None)
 fuzzyInput = u.T
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorFuzzyMomentum = test(fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzyMomentum)
-print('Fuzzy momentum test error = %.10f' % errorFuzzyMomentum)
+print('Fuzzy momentum test error = %.5f' % errorFuzzyMomentum)
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorMomentum = test(npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLPMomentum)
-print('MLP Momentum  test error = %.10f' % errorMomentum)
+print('MLP Momentum  test error = %.5f' % errorMomentum)
 bar_width = 0.25
 plt.bar(0, errorFuzzy, bar_width, label='c-means')
 plt.bar(3 * bar_width / 2, errorFuzzyMomentum, bar_width, label='c-means momentum')
@@ -266,9 +267,3 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 data.close()
-dataOutputFuzzy.close()
-dataOutputMLP.close()
-dataOutputFuzzyMomentum.close()
-dataOutputMLPMomentum.close()
-dataOutputKmeansMomentum.close()
-dataOutputKmeans.close()
