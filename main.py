@@ -200,11 +200,12 @@ for i in range(len(raw_data)):
         outputRaw.append(list(map(float, raw_data[i].split())))
 
 # https://machinelearningmastery.com/implement-backpropagation-algorithm-scratch-python/
-lamb = 0.5
+lamb = 1.850
 cost = 1
 alf = 0.002
 epochs = 800
-c_means_epochs = 1500
+c_means_epochs = 400
+k_means_epochs = 1
 npInput = np.asmatrix(inputRaw)
 npOutput = np.asmatrix(outputRaw)
 iteration = 0
@@ -217,37 +218,38 @@ fuzzyInput = u.T
 n_inputs = len(fuzzyInput[0])
 n_outputs = len(np.asarray(npOutput)[0])
 clusters = list()
+layers = [n_inputs, 30, n_outputs]
 for row in npInput:
-    clusters.append(skl.KMeans(n_clusters=15, random_state=0).fit_predict(np.transpose(row)))
-network = initialize_network_with_layers([n_inputs, 15, n_outputs])
+    clusters.append(skl.KMeans(n_clusters=15,max_iter=k_means_epochs, random_state=0).fit_predict(np.transpose(row)))
+network = initialize_network_with_layers(layers)
 train_network_with_momentum(network, clusters[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorKmeansMomentum = test(clusters[164:206], npInput[164:206], npOutput[164:206], dataOutputKmeansMomentum)
 print('k-means momentum test error = %.5f' % errorKmeansMomentum)
 clusters = list()
 for row in npInput:
     clusters.append(skl.KMeans(n_clusters=15, random_state=0).fit_predict(np.transpose(row), 0))
-network = initialize_network_with_layers([n_inputs, 15, n_outputs])
+network = initialize_network_with_layers(layers)
 train_network(network, clusters[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorKmeans =test(clusters[164:206], npInput[164:206], npOutput[164:206], dataOutputKmeans)
 print('k-means test error = %.5f' % errorKmeans)
-network = initialize_network_with_layers([n_inputs, 15, n_outputs])
+network = initialize_network_with_layers(layers)
 train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorFuzzy = test(fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzy)
 print('Fuzzy test error = %.5f' % errorFuzzy)
 n_inputs = len(np.asarray(npInput)[0])
 n_outputs = len(np.asarray(npOutput)[0])
-network = initialize_network_with_layers([n_inputs, 15, n_outputs])
+network = initialize_network_with_layers(layers)
 train_network(network, npInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 error = test(npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLP)
 print('MLP test error = %.5f' % error)
 cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
     npInput.T, 15, 2, error=0.002, maxiter=c_means_epochs, init=None)
 fuzzyInput = u.T
-network = initialize_network_with_layers([n_inputs, 15, n_outputs])
+network = initialize_network_with_layers(layers)
 train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorFuzzyMomentum = test(fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzyMomentum)
 print('Fuzzy momentum test error = %.5f' % errorFuzzyMomentum)
-network = initialize_network_with_layers([n_inputs, 15, n_outputs])
+network = initialize_network_with_layers(layers)
 train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorMomentum = test(npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLPMomentum)
 print('MLP Momentum  test error = %.5f' % errorMomentum)
