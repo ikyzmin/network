@@ -96,8 +96,10 @@ def update_weights_momentum(network, row, l_rate, momentum):
             inputs = [neuron['output'] for neuron in network[i - 1]]
         for neuron in network[i]:
             for j in range(len(inputs)):
-                neuron['weights'][j] += l_rate * neuron['delta'] * inputs[j] + momentum * neuron['prevDelta'][j]
-                neuron['prevDelta'][j] = neuron['delta']
+                if 'prevDelta' not in neuron:
+                    neuron['prevDelta'] = 0
+                neuron['weights'][j] += l_rate * neuron['delta'] * inputs[j] + momentum * neuron['prevDelta']
+                neuron['prevDelta'] = neuron['delta']
             neuron['weights'][-1] += l_rate * neuron['delta']
 
 
@@ -122,7 +124,7 @@ def train_network(network, train, output, l_rate, n_epoch, n_outputs):
 
 def train_network_with_momentum(network, train, output, l_rate, n_epoch, n_outputs):
     costs = list()
-    momentum = 0.8
+    momentum = 0.01
     for epoch in range(n_epoch):
         sum_error = 0
         rowIndex = 0
@@ -131,8 +133,10 @@ def train_network_with_momentum(network, train, output, l_rate, n_epoch, n_outpu
             expected = output[rowIndex].tolist()[0]
             sum_error += sum([(expected[i] - outputs[i]) ** 2 for i in range(len(expected))])
             backward_propagate_error(network, expected)
-            update_weights(network, row, l_rate)
+            update_weights_momentum(network, row, l_rate, momentum)
             rowIndex += 1
+        sum_error /= len(train)
+        sum_error = np.sqrt(sum_error)
         if epoch % 100 == 0:
             print('>epoch=%d, lrate=%.10f, error=%.10f' % (epoch, l_rate, sum_error))
         costs.append(sum_error)
@@ -142,6 +146,38 @@ def train_network_with_momentum(network, train, output, l_rate, n_epoch, n_outpu
 def predict(network, row):
     outputs = forward_propagate(network, row)
     return outputs
+
+
+# Find the min and max values for each column
+def dataset_minmax(dataset):
+    minmax = list()
+    stats = [[min(column), max(column)] for column in zip(*dataset)]
+    return stats
+
+
+# Rescale dataset columns to the range 0-1
+def normalize_dataset(dataset, minmax):
+    for row in dataset:
+        for i in range(len(row) - 1):
+            row[i] = (row[i] - minmax[i][0]) / (minmax[i][1] - minmax[i][0])
+
+
+def test(testInput, realInput, testOutput, file):
+    error = 0
+    i = 0
+    for row in testInput:
+        prediction = predict(network, row)
+        error += sum(
+            [(testOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(testOutput)[0]))])
+        plt.plot(list(realInput[i].tolist()[0]), testOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
+        plt.plot(list(realInput[i].tolist()[0]), prediction, 'ro', markersize=3, label="Данные персептрона")
+        file.write(
+            "Ожидаемый :\n\r" + str(testOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
+        i += 1
+    error /= len(testInput)
+    plt.legend()
+    plt.show()
+    return np.sqrt(error)
 
 
 seed(1)
@@ -174,149 +210,58 @@ iteration = 0
 fuzzyCost = list()
 perceptronCost = list()
 deltaAv = list()
-
 cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
     npInput.T, 15, 2, error=0.002, maxiter=c_means_epochs, init=None)
-
 fuzzyInput = u.T
 n_inputs = len(fuzzyInput[0])
 n_outputs = len(np.asarray(npOutput)[0])
 clusters = list()
 for row in npInput:
-    clusters.append(skl.KMeans(n_clusters=15, random_state=0).fit_predict(np.transpose(row), 0))
+    clusters.append(skl.KMeans(n_clusters=15, random_state=0).fit_predict(np.transpose(row)))
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network_with_momentum(network, clusters[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-i = 164
-errorKmeansMomentum = 0
-for row in clusters[164:206]:
-    prediction = predict(network, row)
-    errorKmeansMomentum += sum(
-        [(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
-    plt.plot(list(npInput[i].tolist()[0]), npOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
-    plt.plot(list(npInput[i].tolist()[0]), prediction, 'ro', markersize=3, label="Данные персептрона")
-    dataOutputKmeansMomentum.write(
-        "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
-    i += 1
-
+errorKmeansMomentum = test(clusters[164:206], npInput[164:206], npOutput[164:206], dataOutputKmeansMomentum)
 print('k-means momentum test error = %.10f' % errorKmeansMomentum)
-plt.legend()
-plt.show()
-
 clusters = list()
 for row in npInput:
     clusters.append(skl.KMeans(n_clusters=15, random_state=0).fit_predict(np.transpose(row), 0))
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network(network, clusters[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-i = 164
-errorKmeans = 0
-for row in clusters[164:206]:
-    prediction = predict(network, row)
-    errorKmeans += sum(
-        [(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
-    plt.plot(list(npInput[i].tolist()[0]), npOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
-    plt.plot(list(npInput[i].tolist()[0]), prediction, 'ro', markersize=3, label="Данные персептрона")
-    dataOutputKmeans.write(
-        "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
-    i += 1
-
+errorKmeans =test(clusters[164:206], npInput[164:206], npOutput[164:206], dataOutputKmeans)
 print('k-means test error = %.10f' % errorKmeans)
-plt.legend()
-plt.show()
-
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-i = 164
-errorFuzzy = 0
-
-for row in fuzzyInput[164:206]:
-    prediction = predict(network, row)
-    errorFuzzy += sum([(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
-    plt.plot(list(npInput[i].tolist()[0]), npOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
-    plt.plot(list(npInput[i].tolist()[0]), prediction, 'ro', markersize=3, label="Данные персептрона")
-    dataOutputFuzzy.write(
-        "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный:\n\r" + str(prediction) + "\n\r")
-    i += 1
-print('Fuzzy test error = %.10f' % errorFuzzy)
-
-plt.legend()
-plt.show()
-
+errorFuzzy = test(fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzy)
 n_inputs = len(np.asarray(npInput)[0])
 n_outputs = len(np.asarray(npOutput)[0])
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network(network, npInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-i = 164
-error = 0
-for row in np.asarray(npInput[164:206]):
-    prediction = predict(network, row)
-    error += sum([(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
-    plt.plot(list(row), npOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
-    plt.plot(list(row), prediction, 'ro', markersize=3, label="Данные персептрона")
-    dataOutputMLP.write(
-        "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
-    i += 1
+error = test(npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLP)
 print('MLP test error = %.10f' % error)
-
-plt.legend()
-plt.show()
-
 cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
     npInput.T, 15, 2, error=0.002, maxiter=c_means_epochs, init=None)
-
 fuzzyInput = u.T
-
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-i = 164
-errorFuzzyMomentum = 0
-for row in fuzzyInput[164:206]:
-    prediction = predict(network, row)
-    errorFuzzyMomentum += sum(
-        [(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
-    plt.plot(list(npInput[i].tolist()[0]), npOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
-    plt.plot(list(npInput[i].tolist()[0]), prediction, 'ro', markersize=3, label="Данные персептрона")
-    dataOutputFuzzyMomentum.write(
-        "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
-    i += 1
-
+errorFuzzyMomentum = test(fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzyMomentum)
 print('Fuzzy momentum test error = %.10f' % errorFuzzyMomentum)
-plt.legend()
-plt.show()
-
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-i = 164
-errorMomentum = 0
-for row in np.asarray(npInput[164:206]):
-    prediction = predict(network, row)
-    errorMomentum += sum(
-        [(npOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(npOutput)[0]))])
-    plt.plot(list(row), npOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
-    plt.plot(list(row), prediction, 'ro', markersize=3, label="Данные персептрона")
-    dataOutputMLPMomentum.write(
-        "Ожидаемый :\n\r" + str(npOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
-    i += 1
+errorMomentum = test(npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLPMomentum)
 print('MLP Momentum  test error = %.10f' % errorMomentum)
-plt.legend()
-plt.show()
-
-
-
-
 bar_width = 0.25
 plt.bar(0, errorFuzzy, bar_width, label='c-means')
 plt.bar(3 * bar_width / 2, errorFuzzyMomentum, bar_width, label='c-means momentum')
 plt.bar(3 * bar_width, error, bar_width, label='perceptron')
 plt.bar(9 * bar_width / 2, errorMomentum, bar_width, label='perceptron momentum')
 plt.bar(6 * bar_width, errorKmeans, bar_width, label='k-means momentum')
-plt.bar(15 * bar_width/2, errorKmeansMomentum, bar_width, label='k-means')
-
+plt.bar(15 * bar_width / 2, errorKmeansMomentum, bar_width, label='k-means')
 
 plt.ylabel('Погрешность')
 plt.xlabel('Персептрон')
 plt.title('Погрешность тестирования сетей')
-plt.xticks((0, 3 * bar_width / 2, 3 * bar_width, 9 * bar_width / 2,6 * bar_width,15 * bar_width/2),
-           ('c-means', 'c-means momentum', 'perceptron', "perceptron momentum","k-means momentum","k-means"))
+plt.xticks((0, 3 * bar_width / 2, 3 * bar_width, 9 * bar_width / 2, 6 * bar_width, 15 * bar_width / 2),
+           ('c-means', 'c-means momentum', 'perceptron', "perceptron momentum", "k-means momentum", "k-means"))
 plt.legend()
 plt.tight_layout()
 plt.show()
