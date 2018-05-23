@@ -170,7 +170,7 @@ def test(testInput, realInput, testOutput, file):
         error += sum(
             [(testOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(testOutput)[0]))])
         plt.plot(list(realInput[i].tolist()[0]), testOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
-        plt.plot(list(realInput[i].tolist()[0]), prediction, 'ro', markersize=3, label="Данные персептрона")
+        plt.plot(list(realInput[i].tolist()[0]), prediction, 'rs', markersize=5, label="Данные персептрона")
         file.write(
             "Ожидаемый :\n\r" + str(testOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
         i += 1
@@ -200,7 +200,7 @@ for i in range(len(raw_data)):
         outputRaw.append(list(map(float, raw_data[i].split())))
 
 # https://machinelearningmastery.com/implement-backpropagation-algorithm-scratch-python/
-lamb = 1.850
+lamb = 0.5
 cost = 1
 alf = 0.002
 epochs = 800
@@ -222,7 +222,7 @@ for row in npInput:
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network_with_momentum(network, clusters[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorKmeansMomentum = test(clusters[164:206], npInput[164:206], npOutput[164:206], dataOutputKmeansMomentum)
-print('k-means momentum test error = %.10f' % errorKmeansMomentum)
+print('k-means momentum test error = %.5f' % errorKmeansMomentum)
 clusters = list()
 for row in npInput:
     clusters.append(skl.KMeans(n_clusters=15, random_state=0).fit_predict(np.transpose(row), 0))
@@ -233,6 +233,7 @@ print('k-means test error = %.5f' % errorKmeans)
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
 train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
 errorFuzzy = test(fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzy)
+print('Fuzzy test error = %.5f' % errorFuzzy)
 n_inputs = len(np.asarray(npInput)[0])
 n_outputs = len(np.asarray(npOutput)[0])
 network = initialize_network_with_layers([n_inputs, 15, n_outputs])
