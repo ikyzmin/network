@@ -1,13 +1,15 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import skfuzzy as fuzz
-import sklearn.cluster as skl
+import numpy as np
+
+from sklearn.base import BaseEstimator
+from sklearn.utils import check_random_state
+from sklearn.metrics.pairwise import euclidean_distances, manhattan_distances
+
 from random import *
 import math
-import os
 
 
-# Initialize a network
 def initialize_network(n_inputs, n_hidden, n_outputs):
     network = list()
     hidden_layer = [{'weights': [np.random.uniform() for i in range(n_inputs + 1)]} for j in range(n_hidden)]
@@ -116,15 +118,16 @@ def train_network(network, train, output, l_rate, n_epoch, n_outputs):
             backward_propagate_error(network, expected)
             update_weights(network, row, l_rate)
             rowIndex += 1
+        sum_error /= len(train)
+        sum_error = math.sqrt(sum_error)
         if epoch % 100 == 0:
             print('>epoch=%d, lrate=%.2f, error=%.5f' % (epoch, l_rate, sum_error))
         costs.append(sum_error)
     return costs
 
 
-def train_network_with_momentum(network, train, output, l_rate, n_epoch, n_outputs):
+def train_network_with_momentum(network, train, output, l_rate, momentum, n_epoch, n_outputs):
     costs = list()
-    momentum = 0.01
     for epoch in range(n_epoch):
         sum_error = 0
         rowIndex = 0
@@ -162,14 +165,15 @@ def normalize_dataset(dataset, minmax):
             row[i] = (row[i] - minmax[i][0]) / (minmax[i][1] - minmax[i][0])
 
 
-def test(testInput, realInput, testOutput, file):
+def test(network, testInput, realInput, testOutput, file):
     error = 0
     i = 0
     for row in testInput:
         prediction = predict(network, row)
         error += sum(
             [(testOutput[i].tolist()[0][j] - prediction[j]) ** 2 for j in range(len(np.asarray(testOutput)[0]))])
-        plt.plot(list(realInput[i].tolist()[0]), testOutput[i].tolist()[0], 'go', markersize=3, label="Контрольная выборка")
+        plt.plot(list(realInput[i].tolist()[0]), testOutput[i].tolist()[0], 'bo', markersize=3,
+                 label="Контрольная выборка")
         plt.plot(list(realInput[i].tolist()[0]), prediction, 'rs', markersize=5, label="Данные персептрона")
         file.write(
             "Ожидаемый :\n\r" + str(testOutput[i].tolist()[0]) + "\n\rПолученный :\n\r" + str(prediction) + "\n\r")
@@ -181,92 +185,217 @@ def test(testInput, realInput, testOutput, file):
     return np.sqrt(error)
 
 
-seed(1)
-data = open("data.txt")
-dataOutputFuzzy = open("fuzzy_results.txt", 'w+')
-dataOutputMLP = open("MLP_results.txt", 'w+')
-dataOutputFuzzyMomentum = open("fuzzy_momentum_results.txt", 'w+')
-dataOutputMLPMomentum = open("MLP_momentum_results.txt", 'w+')
-dataOutputKmeansMomentum = open("kmeans_momentum_results.txt", 'w+')
-dataOutputKmeans = open("kmeans_results.txt", 'w+')
-raw_data = data.read().split("\n")
-inputRaw = []
-outputRaw = []
-raw_data = list(filter(None, raw_data))
-for i in range(len(raw_data)):
-    if i % 2 != 0:
-        inputRaw.append(list(map(float, raw_data[i].split())))
-    else:
-        outputRaw.append(list(map(float, raw_data[i].split())))
+class KMeans(BaseEstimator):
 
-# https://machinelearningmastery.com/implement-backpropagation-algorithm-scratch-python/
-lamb = 1.850
-cost = 1
-alf = 0.002
-epochs = 800
-c_means_epochs = 400
-k_means_epochs = 1
-npInput = np.asmatrix(inputRaw)
-npOutput = np.asmatrix(outputRaw)
-iteration = 0
-fuzzyCost = list()
-perceptronCost = list()
-deltaAv = list()
-cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
-    npInput.T, 15, 2, error=0.002, maxiter=c_means_epochs, init=None)
-fuzzyInput = u.T
-n_inputs = len(fuzzyInput[0])
-n_outputs = len(np.asarray(npOutput)[0])
-clusters = list()
-layers = [n_inputs, 30, n_outputs]
-for row in npInput:
-    clusters.append(skl.KMeans(n_clusters=15,max_iter=k_means_epochs, random_state=0).fit_predict(np.transpose(row)))
-network = initialize_network_with_layers(layers)
-train_network_with_momentum(network, clusters[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-errorKmeansMomentum = test(clusters[164:206], npInput[164:206], npOutput[164:206], dataOutputKmeansMomentum)
-print('k-means momentum test error = %.5f' % errorKmeansMomentum)
-clusters = list()
-for row in npInput:
-    clusters.append(skl.KMeans(n_clusters=15, random_state=0).fit_predict(np.transpose(row), 0))
-network = initialize_network_with_layers(layers)
-train_network(network, clusters[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-errorKmeans =test(clusters[164:206], npInput[164:206], npOutput[164:206], dataOutputKmeans)
-print('k-means test error = %.5f' % errorKmeans)
-network = initialize_network_with_layers(layers)
-train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-errorFuzzy = test(fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzy)
-print('Fuzzy test error = %.5f' % errorFuzzy)
-n_inputs = len(np.asarray(npInput)[0])
-n_outputs = len(np.asarray(npOutput)[0])
-network = initialize_network_with_layers(layers)
-train_network(network, npInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-error = test(npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLP)
-print('MLP test error = %.5f' % error)
-cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
-    npInput.T, 15, 2, error=0.002, maxiter=c_means_epochs, init=None)
-fuzzyInput = u.T
-network = initialize_network_with_layers(layers)
-train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-errorFuzzyMomentum = test(fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzyMomentum)
-print('Fuzzy momentum test error = %.5f' % errorFuzzyMomentum)
-network = initialize_network_with_layers(layers)
-train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
-errorMomentum = test(npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLPMomentum)
-print('MLP Momentum  test error = %.5f' % errorMomentum)
-bar_width = 0.25
-plt.bar(0, errorFuzzy, bar_width, label='c-means')
-plt.bar(3 * bar_width / 2, errorFuzzyMomentum, bar_width, label='c-means momentum')
-plt.bar(3 * bar_width, error, bar_width, label='perceptron')
-plt.bar(9 * bar_width / 2, errorMomentum, bar_width, label='perceptron momentum')
-plt.bar(6 * bar_width, errorKmeans, bar_width, label='k-means momentum')
-plt.bar(15 * bar_width / 2, errorKmeansMomentum, bar_width, label='k-means')
+    def __init__(self, k, max_iter=100, random_state=0, tol=1e-4):
+        self.k = k
+        self.max_iter = max_iter
+        self.random_state = random_state
+        self.tol = tol
 
-plt.ylabel('Погрешность')
-plt.xlabel('Персептрон')
-plt.title('Погрешность тестирования сетей')
-plt.xticks((0, 3 * bar_width / 2, 3 * bar_width, 9 * bar_width / 2, 6 * bar_width, 15 * bar_width / 2),
-           ('c-means', 'c-means momentum', 'perceptron', "perceptron momentum", "k-means momentum", "k-means"))
-plt.legend()
-plt.tight_layout()
-plt.show()
-data.close()
+    def _e_step(self, X):
+        self.labels_ = euclidean_distances(X, self.cluster_centers_,
+                                           squared=True).argmin(axis=1)
+
+    def _average(self, X):
+        return X.mean(axis=0)
+
+    def _m_step(self, X):
+        X_center = None
+        for center_id in range(self.k):
+            center_mask = self.labels_ == center_id
+            if not np.any(center_mask):
+                # The centroid of empty clusters is set to the center of
+                # everything
+                if X_center is None:
+                    X_center = self._average(X)
+                self.cluster_centers_[center_id] = X_center
+            else:
+                self.cluster_centers_[center_id] = \
+                    self._average(X[center_mask])
+
+    def fit(self, X, y=None):
+        n_samples = X.shape[0]
+        vdata = np.mean(np.var(X, 0))
+
+        random_state = check_random_state(self.random_state)
+        self.labels_ = random_state.permutation(n_samples)[:self.k]
+        self.cluster_centers_ = X[self.labels_]
+
+        for i in range(self.max_iter):
+            centers_old = self.cluster_centers_.copy()
+
+            self._e_step(X)
+            self._m_step(X)
+
+            if np.sum((centers_old - self.cluster_centers_) ** 2) < self.tol * vdata:
+                break
+
+        return self
+
+
+class KMedians(KMeans):
+
+    def _e_step(self, X):
+        self.labels_ = manhattan_distances(X, self.cluster_centers_).argmin(axis=1)
+
+    def _average(self, X):
+        return np.median(X, axis=0)
+
+
+class FuzzyKMeans(KMeans):
+
+    def __init__(self, k, m=2, max_iter=100, random_state=0, tol=1e-4):
+
+        self.k = k
+        assert m > 1
+        self.m = m
+        self.max_iter = max_iter
+        self.random_state = random_state
+        self.tol = tol
+
+    def _e_step(self, X):
+        D = 1.0 / euclidean_distances(X, self.cluster_centers_, squared=True)
+        D **= 1.0 / (self.m - 1)
+        D /= np.sum(D, axis=1)[:, np.newaxis]
+        # shape: n_samples x k
+        self.fuzzy_labels_ = D
+        self.labels_ = self.fuzzy_labels_.argmax(axis=1)
+
+    def _m_step(self, X):
+        weights = self.fuzzy_labels_ ** self.m
+        # shape: n_clusters x n_features
+        self.cluster_centers_ = np.dot(X.T, weights).T
+        self.cluster_centers_ /= weights.sum(axis=0)[:, np.newaxis]
+
+    def fit(self, X, y=None):
+        n_samples, n_features = X.shape
+        vdata = np.mean(np.var(X, 0))
+
+        random_state = check_random_state(self.random_state)
+        self.fuzzy_labels_ = random_state.rand(n_samples, self.k)
+        self.fuzzy_labels_ /= self.fuzzy_labels_.sum(axis=1)[:, np.newaxis]
+        self._m_step(X)
+
+        for i in range(self.max_iter):
+            centers_old = self.cluster_centers_.copy()
+
+            self._e_step(X)
+            self._m_step(X)
+
+            if np.sum((centers_old - self.cluster_centers_) ** 2) < self.tol * vdata:
+                break
+
+        return self
+
+
+def run_experiment_with(lrate, momentum, layers, fuzzyEpochs):
+    seed(1)
+    data = open("data.txt")
+    dataOutputFuzzy = open("fuzzy_results_l_%s_m_%s_layers_%s_fepochs_%s.txt" % (lrate, momentum, layers, fuzzyEpochs),
+                           'w+')
+    dataOutputMLP = open("MLP_results_l_%s_m_%s_layers_%s_fepochs_%s.txt" % (lrate, momentum, layers, fuzzyEpochs),
+                         'w+')
+    dataOutputFuzzyMomentum = open(
+        "fuzzy_momentum_results_l_%s_m_%s_layers_%s_fepochs_%s.txt" % (lrate, momentum, layers, fuzzyEpochs), 'w+')
+    dataOutputMLPMomentum = open(
+        "MLP_momentum_results_l_%s_m_%s_layers_%s_fepochs_%s.txt" % (lrate, momentum, layers, fuzzyEpochs), 'w+')
+    dataOutputKmeansMomentum = open(
+        "kmeans_momentum_results_l_%s_m_%s_layers_%s_fepochs_%s.txt" % (lrate, momentum, layers, fuzzyEpochs), 'w+')
+    dataOutputKmeans = open(
+        "kmeans_results_l_%s_m_%s_layers_%s_fepochs_%s.txt" % (lrate, momentum, layers, fuzzyEpochs), 'w+')
+    raw_data = data.read().split("\n")
+    inputRaw = []
+    outputRaw = []
+    raw_data = list(filter(None, raw_data))
+    for i in range(len(raw_data)):
+        if i % 2 != 0:
+            inputRaw.append(list(map(float, raw_data[i].split())))
+        else:
+            outputRaw.append(list(map(float, raw_data[i].split())))
+
+    print("experiment with lrate = %s momentum = %s layers = %s fuzzy epochs = %s" % (
+        lrate, momentum, layers, fuzzyEpochs))
+    lamb = lrate
+    epochs = 800
+    c_means_epochs = fuzzyEpochs
+    npInput = np.asmatrix(inputRaw)
+    npOutput = np.asmatrix(outputRaw)
+    cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
+        npInput.T, 15, 2, error=0.002, maxiter=c_means_epochs, init=None)
+    fuzzyInput = u.T
+    n_inputs = len(fuzzyInput[0])
+    n_outputs = len(np.asarray(npOutput)[0])
+
+    layers = [n_inputs, 15, n_outputs]
+    network = initialize_network_with_layers(layers)
+    train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
+    errorFuzzy = test(network, fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzy)
+    print('Fuzzy test error = %.5f' % errorFuzzy)
+    kmeans = FuzzyKMeans(k=15)
+    kmeans.fit(npInput)
+    network = initialize_network_with_layers(layers)
+    train_network_with_momentum(network, kmeans.fuzzy_labels_[0:164], npOutput[0:164], lamb, momentum, epochs,
+                                n_outputs)
+    errorKmeansMomentum = test(network, kmeans.fuzzy_labels_[164:206], npInput[164:206], npOutput[164:206],
+                               dataOutputKmeansMomentum)
+    print('k-means momentum test error = %.5f' % errorKmeansMomentum)
+    kmeans = FuzzyKMeans(k=15)
+    kmeans.fit(npInput)
+    network = initialize_network_with_layers(layers)
+    train_network(network, kmeans.fuzzy_labels_[0:164], npOutput[0:164], lamb, epochs, n_outputs)
+    errorKmeans = test(network, kmeans.fuzzy_labels_[164:206], npInput[164:206], npOutput[164:206], dataOutputKmeans)
+    print('k-means test error = %.5f' % errorKmeans)
+    n_inputs = len(np.asarray(npInput)[0])
+    n_outputs = len(np.asarray(npOutput)[0])
+    network = initialize_network_with_layers(layers)
+    train_network(network, npInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
+    error = test(network, npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLP)
+    print('MLP test error = %.5f' % error)
+    cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
+        npInput.T, 15, 2, error=0.002, maxiter=c_means_epochs, init=None)
+    fuzzyInput = u.T
+    network = initialize_network_with_layers(layers)
+    train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, momentum, epochs, n_outputs)
+    errorFuzzyMomentum = test(network, fuzzyInput[164:206], npInput[164:206], npOutput[164:206],
+                              dataOutputFuzzyMomentum)
+    print('Fuzzy momentum test error = %.5f' % errorFuzzyMomentum)
+    network = initialize_network_with_layers(layers)
+    train_network_with_momentum(network, fuzzyInput[0:164], npOutput[0:164], lamb, momentum, epochs, n_outputs)
+    errorMomentum = test(network, npInput[164:206], npInput[164:206], npOutput[164:206], dataOutputMLPMomentum)
+    print('MLP Momentum  test error = %.5f' % errorMomentum)
+    bar_width = 0.25
+    plt.bar(0, errorFuzzy, bar_width, label='c-means')
+    plt.bar(3 * bar_width / 2, errorFuzzyMomentum, bar_width, label='c-means momentum')
+    plt.bar(3 * bar_width, error, bar_width, label='perceptron')
+    plt.bar(9 * bar_width / 2, errorMomentum, bar_width, label='perceptron momentum')
+    plt.bar(6 * bar_width, errorKmeans, bar_width, label='k-means momentum')
+    plt.bar(15 * bar_width / 2, errorKmeansMomentum, bar_width, label='k-means')
+
+    plt.ylabel('Погрешность')
+    plt.xlabel('Персептрон')
+    plt.title('Погрешность тестирования сетей')
+    plt.xticks((0, 3 * bar_width / 2, 3 * bar_width, 9 * bar_width / 2, 6 * bar_width, 15 * bar_width / 2),
+               ('c-means', 'c-means momentum', 'perceptron', "perceptron momentum", "k-means momentum", "k-means"))
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    data.close()
+
+
+run_experiment_with(0.2, 0.99, [15, 15, 15], 1200)
+run_experiment_with(0.4, 0.99, [15, 15, 15], 1200)
+run_experiment_with(0.99, 0.99, [15, 15, 15], 1200)
+
+run_experiment_with(0.99, 0.2, [15, 15, 15], 1200)
+run_experiment_with(0.99, 0.4, [15, 15, 15], 1200)
+run_experiment_with(0.99, 0.99, [15, 15, 15], 1200)
+
+run_experiment_with(0.99, 0.99, [15, 15, 15], 200)
+run_experiment_with(0.99, 0.99, [15, 15, 15], 600)
+run_experiment_with(0.99, 0.99, [15, 15, 15], 1200)
+
+run_experiment_with(0.99, 0.99, [15, 15, 15], 1200)
+run_experiment_with(0.99, 0.99, [15, 30, 15], 1200)
+run_experiment_with(0.99, 0.99, [15, 15, 15, 15], 1200)
+run_experiment_with(0.99, 0.99, [15, 30, 30, 15], 1200)
