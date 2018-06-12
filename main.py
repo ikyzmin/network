@@ -327,7 +327,6 @@ def run_experiment_with(lrate, momentum, layers, fuzzyEpochs):
     n_inputs = len(fuzzyInput[0])
     n_outputs = len(np.asarray(npOutput)[0])
 
-    layers = [n_inputs, 15, n_outputs]
     network = initialize_network_with_layers(layers)
     train_network(network, fuzzyInput[0:164], npOutput[0:164], lamb, epochs, n_outputs)
     errorFuzzy = test(network, fuzzyInput[164:206], npInput[164:206], npOutput[164:206], dataOutputFuzzy)
